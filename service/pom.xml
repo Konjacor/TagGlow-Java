@@ -17,7 +17,11 @@
     </properties>
 
     <dependencies>
-
+        <dependency>
+            <groupId>com.amap.api</groupId>
+            <artifactId>location</artifactId>
+            <version>5.2.0</version>
+        </dependency>
         <dependency>
             <groupId>com.vivo50</groupId>
             <artifactId>common</artifactId>
