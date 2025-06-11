@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.ArrayList;
@@ -140,5 +141,25 @@ public class NoteController {
         boolean isSaved = noteService.save(note);
         return isSaved ? R.ok().message("笔记添加成功") : R.error().message("笔记添加失败");
     }
+
+    @ApiOperation(value = "删除笔记")
+    @DeleteMapping("/delete/{Id}")
+    public R deleteNote(@PathVariable String Id, @RequestParam String userId) {
+        System.out.println("删除笔记 ID: " + Id);
+        Note note = noteService.getById(Id);
+        System.out.println("查询到的笔记：" + note);
+        if (note == null) {
+            return R.error().message("笔记不存在");
+        }
+        if (!note.getUserId().equals(userId)) {
+            return R.error().message("你不能删除别人的笔记");
+        }
+
+        boolean result = noteService.removeById(Id);
+
+        return result ? R.ok().message("删除成功") : R.error().message("删除失败");
+    }
+
+
 }
 

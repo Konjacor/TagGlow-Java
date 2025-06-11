@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.annotation.*;
 
 import java.util.Date;
 import java.io.Serializable;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -43,18 +45,21 @@ public class Note implements Serializable {
     private String weather;
 
     @ApiModelProperty(value = "记笔记时的时间")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "GMT+8")
     private Date time;
 
     @ApiModelProperty(value = "记录创建时间")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "GMT+8")
     @TableField(fill = FieldFill.INSERT)
     private Date gmtCreate;
 
     @ApiModelProperty(value = "记录修改时间")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "GMT+8")
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private Date gmtModified;
 
     @ApiModelProperty(value = "是否被逻辑删除 0-否 1-是")
-    @TableField(fill = FieldFill.INSERT)
+    @TableField(value = "is_deleted", fill = FieldFill.INSERT)
     @TableLogic
     private Integer isDeleted;
 

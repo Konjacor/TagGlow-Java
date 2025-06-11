@@ -2,7 +2,7 @@ package com.vivo50.service.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sun.javafx.collections.MappingChange;
+
 import com.vivo50.service.constant.VivoAiPromptConstant;
 import com.vivo50.service.constant.VivoAuthConstant;
 import com.vivo50.service.entity.Tag;
@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
+
+// import com.sun.javafx.collections.MappingChange;
 
 /**
  * @author Konjacer
