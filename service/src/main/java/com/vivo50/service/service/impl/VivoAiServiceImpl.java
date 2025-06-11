@@ -32,6 +32,10 @@ public class VivoAiServiceImpl implements VivoAiService {
             List<Tag> tags = new ArrayList<>();
             for (String stringTagType : stringTagTypes) {
                 String[] tagType = stringTagType.split(":");
+                if (tagType.length < 2) {
+                    // 跳过格式错误的标签，如 "水果"
+                    continue;
+                }
                 Tag tag = new Tag();
                 tag.setContent(tagType[0]);
                 tag.setType(tagType[1]);
