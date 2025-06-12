@@ -47,7 +47,7 @@ public class UserTagRelation implements Serializable {
     @ApiModelProperty(value = "是否被逻辑删除 0-否 1-是")
     @TableField(fill = FieldFill.INSERT)
     @TableLogic
-    private Integer isDeleted;
+    private Integer isDeleted=0;
 
 
 }

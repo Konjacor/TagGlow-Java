@@ -254,6 +254,7 @@ public class NoteController {
         }
     }
 
+    @ApiOperation("根据IP获取天气信息，已经处理了中文转换")
     @GetMapping("/getWeather")
     public R getWeather(HttpServletRequest request) {
         double latitude = 39.12;    // 天津
