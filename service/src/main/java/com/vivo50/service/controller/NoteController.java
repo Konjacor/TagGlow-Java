@@ -13,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 //import net.dreamlu.mica.ip2region.core.Ip2regionSearcher;
 //import org.lionsoul.ip2region.xdb.Searcher;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.PostConstruct;
@@ -251,6 +253,60 @@ public class NoteController {
             return R.error().message("获取地理位置异常: " + e.getMessage());
         }
     }
+
+    @GetMapping("/getWeather")
+    public R getWeather(HttpServletRequest request) {
+        double latitude = 39.12;    // 天津
+        double longitude = 117.2;
+
+        try {
+            String url = String.format(
+                    "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current_weather=true",
+                    latitude, longitude
+            );
+
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                Map body = response.getBody();
+                Map currentWeather = (Map) body.get("current_weather");
+                if (currentWeather != null) {
+                    double temperature = (double) currentWeather.get("temperature");
+                    int weatherCode = (int) currentWeather.get("weathercode");
+
+                    String weatherDesc = getWeatherDescription(weatherCode);
+                    String result = String.format("%s", weatherDesc);
+
+                    return R.ok().data("weather", result);
+                }
+            }
+            return R.error().message("无法获取天气信息");
+        } catch (Exception e) {
+            return R.error().message("获取天气失败: " + e.getMessage());
+        }
+    }
+
+    // 根据 weathercode 返回中文天气描述
+    private String getWeatherDescription(int code) {
+        switch (code) {
+            case 0: return "晴";
+            case 1: case 2: return "多云";
+            case 3: return "阴";
+            case 45: case 48: return "有雾";
+            case 51: case 53: case 55: return "小雨";
+            case 61: case 63: case 65: return "中到大雨";
+            case 66: case 67: return "冻雨";
+            case 71: case 73: case 75: return "小雪";
+            case 77: return "阵雪";
+            case 80: case 81: case 82: return "阵雨";
+            case 85: case 86: return "大雪";
+            case 95: return "雷雨";
+            case 96: case 99: return "强雷雨";
+            default: return "未知";
+        }
+    }
+
 
 
 
