@@ -13,11 +13,16 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.xml.transform.Result;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
 
 /**
  * <p>
@@ -159,6 +164,19 @@ public class NoteController {
 
         return result ? R.ok().message("删除成功") : R.error().message("删除失败");
     }
+
+    @ApiOperation(value = "获取当前时间")
+    @GetMapping("/time/now")
+    public R getCurrentBeijingTime() {
+        // 获取当前北京时间
+        LocalDateTime beijingTime = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
+        String formattedTime = beijingTime.format(DateTimeFormatter.ofPattern("HH:mm"));
+
+        // 返回标准响应对象
+        return R.ok().data("time", formattedTime);
+    }
+
+
 
 
 }
