@@ -31,3 +31,10 @@
 - AI服务的prompt和systemPrompt(人设)作为常量在src/main/java/com/vivo50/service/constant/VivoAiPromptConstant.java中统一管理。
 - 在写controller层接口时可以注入VivoAiService来使用AI服务的service层接口功能。
 - 示例在src/main/java/com/vivo50/service/controller/NoteController.java中的saveNote方法。
+
+## AI服务
+
+- AI服务接口在src/main/java/com/vivo50/service/service/VivoAiService.java，在这里面写关于AI服务的service接口，实现类在src/main/java/com/vivo50/service/service/impl/VivoAiServiceImpl.java，在这里面实现AI服务的service接口。
+- AI服务的prompt和systemPrompt(人设)作为常量在src/main/java/com/vivo50/service/constant/VivoAiPromptConstant.java中统一管理。
+- 在写controller层接口时可以注入VivoAiService来使用AI服务的service层接口功能。
+- 示例在src/main/java/com/vivo50/service/controller/NoteController.java中的saveNote方法。

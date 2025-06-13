@@ -3,15 +3,12 @@ package com.vivo50.service.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.vivo50.common.Result.R;
-import com.vivo50.service.entity.Note;
-import com.vivo50.service.entity.NoteTagRelation;
-import com.vivo50.service.entity.Tag;
-import com.vivo50.service.entity.UserTagRelation;
+import com.vivo50.service.entity.*;
 import com.vivo50.service.service.*;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.Api;
 import lombok.extern.slf4j.Slf4j;
-//import net.dreamlu.mica.ip2region.core.Ip2regionSearcher;
-//import org.lionsoul.ip2region.xdb.Searcher;
+import org.apache.catalina.filters.ExpiresFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -27,11 +26,10 @@ import java.util.*;
 
 import org.springframework.web.client.RestTemplate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-
-
-
-
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * <p>
@@ -45,6 +43,7 @@ import java.util.Map;
 @RequestMapping("/service/note")
 @CrossOrigin
 @Slf4j
+@Api(tags = "笔记服务")
 public class NoteController {
 
     @Autowired
@@ -61,9 +60,6 @@ public class NoteController {
 
     @Autowired
     VivoAiService vivoAiService;
-
-
-
 
     @ApiOperation("保存笔记提取标签保存标签")
     @PostMapping("/saveNote")
@@ -106,45 +102,64 @@ public class NoteController {
         }
         return R.ok().message("保存成功");
     }
-    @ApiOperation("获取用户首页统计信息（统计总笔记数量、有地址的总笔记数量、最新笔记日期、最新且有地址的笔记日期）")
-    @GetMapping("/homeStats/{userId}")
-    public R getHomeStats(@PathVariable String userId) {
-        log.info("获取用户首页统计信息，用户ID: {}", userId);
+    @ApiOperation("统计总笔记数量")
+    @GetMapping("/totalNotes/{user_id}")
+    public R getTotalNotes(@PathVariable String userId) {
+        log.info("统计总笔记数量，用户ID: {}", userId);
 
-        // 查询用户的所有笔记（排除已删除的）
+        QueryWrapper<Note> noteWrapper = new QueryWrapper<>();
+
+        noteWrapper.eq("user_id", userId).eq("is_deleted", 0);
+        int totalNotes = noteService.count(noteWrapper);
+
+        return R.ok().data("totalNotes", totalNotes);
+    }
+    @ApiOperation("统计有地址的笔记数量(用”.“来判断，若有则说明是有地址的，若没有就这个值是null)")
+    @GetMapping("/notesWithAddress/{user_id}")
+    public R getNotesWithAddress(@PathVariable String userId) {
+        log.info("统计有地址的笔记数量，用户ID: {}", userId);
+        QueryWrapper<Note> noteWrapper = new QueryWrapper<>();
+        noteWrapper.eq("user_id", userId).eq("is_deleted", 0);
+        List<Note> notes = noteService.list(noteWrapper);
+        log.info("Fetched notes: {}", notes);
+        long notesWithAddress = notes.stream()
+                .filter(note -> note.getPosition() != null && note.getPosition().contains("."))
+                .count();
+
+        return R.ok().data("notesWithAddress", notesWithAddress);
+    }
+
+    @ApiOperation("获取最新写的笔记（返回笔记id）")
+    @GetMapping("/latestNote/{user_id}")
+    public R getLatestNote(@PathVariable String userId) {
+        log.info("获取最新写的笔记，用户ID: {}", userId);
         QueryWrapper<Note> noteWrapper = new QueryWrapper<>();
         noteWrapper.eq("user_id", userId).eq("is_deleted", 0);
         List<Note> notes = noteService.list(noteWrapper);
 
-        // 统计总笔记数量
-        int totalNotes = notes.size();
-
-        // 统计有地址的笔记数量
-        long notesWithAddress = notes.stream()
-                .filter(note -> note.getPosition() != null && !note.getPosition().isEmpty())
-                .count();
-
-        // 获取最新写的笔记
         Note latestNote = notes.stream()
                 .max((n1, n2) -> n1.getTime().compareTo(n2.getTime()))
                 .orElse(null);
 
-        // 获取最新写的且有地址的笔记
-        Note latestNoteWithAddress = notes.stream()
-                .filter(note -> note.getPosition() != null && !note.getPosition().isEmpty())
-                .max((n1, n2) -> n1.getTime().compareTo(n2.getTime()))
-                .orElse(null);
-
-        // 构建响应数据
-        Map<String, Object> response = new HashMap<>();
-        response.put("totalNotes", totalNotes);
-        response.put("notesWithAddress", notesWithAddress);
-        response.put("latestNote", latestNote);
-        response.put("latestNoteWithAddress", latestNoteWithAddress);
-
-        return R.ok().data(response);
+        return latestNote != null ? R.ok().data("latestNoteId", latestNote.getId()) : R.error().message("没有笔记");
     }
 
+    @ApiOperation("获取最新写的且有地址的笔记（返回笔记id）")
+    @GetMapping("/latestNoteWithAddress/{user_id}")
+    public R getLatestNoteWithAddress(@PathVariable String userId) {
+        log.info("获取最新写的且有地址的笔记，用户ID: {}", userId);
+
+        QueryWrapper<Note> noteWrapper = new QueryWrapper<>();
+        noteWrapper.eq("user_id", userId).eq("is_deleted", 0);
+        List<Note> notes = noteService.list(noteWrapper);
+        log.info("Fetched notes: {}", notes);
+        Note latestNoteWithAddress = notes.stream()
+                .filter(note -> note.getPosition() != null && note.getPosition().contains("."))
+                .max((n1, n2) -> n1.getTime().compareTo(n2.getTime()))
+                .orElse(null);
+        log.info("Fetched notes: {}", latestNoteWithAddress);
+        return latestNoteWithAddress != null ? R.ok().data("latestNoteWithAddressId", latestNoteWithAddress.getId()) : R.error().message("没有有地址的笔记");
+    }
     @ApiOperation("添加新笔记（简单）")
     @PostMapping("/addNote")
     public R addNote(@RequestBody Note note) {
@@ -253,6 +268,8 @@ public class NoteController {
             return R.error().message("获取地理位置异常: " + e.getMessage());
         }
     }
+
+
 
     @ApiOperation("根据IP获取天气信息，已经处理了中文转换")
     @GetMapping("/getWeather")
