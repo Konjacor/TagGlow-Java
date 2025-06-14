@@ -156,7 +156,7 @@ public class MapController {
             String postStr = String.format("{\"lon\":%f,\"lat\":%f,\"ver\":1}", longitude, latitude);
             String tianDiTuUrl = String.format(
                     "http://api.tianditu.gov.cn/geocoder?postStr=%s&type=geocode&tk=cb3168e2f21d5f5569a6a8a1cc92c1a9",
-                    URLEncoder.encode(postStr, StandardCharsets.UTF_8)
+                    URLEncoder.encode(postStr, StandardCharsets.UTF_8.toString())
             );
 
             log.info("Constructed URL: {}", tianDiTuUrl);

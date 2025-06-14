@@ -326,7 +326,15 @@ public class NoteController {
     }
 
 
-
+    @ApiOperation("根据用户id获取其所有笔记(测试)")
+    @GetMapping("/getNotesByUserId/{userId}")
+    public R saveNote(@PathVariable String userId) {
+        log.info("根据用户id获取其所有笔记");
+        QueryWrapper<Note> wrapper = new QueryWrapper<>();
+        wrapper.eq("user_id", userId);
+        List<Note> noteList = noteService.list(wrapper);
+        return R.ok().data("items",noteList);
+    }
 
 }
 
