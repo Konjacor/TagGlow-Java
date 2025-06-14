@@ -1,11 +1,13 @@
 package com.vivo50.service.controller;
 
 
+import com.vivo50.service.entity.Tag;
+import com.vivo50.service.service.TagService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
 
-import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
 
 /**
  * <p>
@@ -20,6 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 @CrossOrigin
 @Slf4j
 public class TagController {
+    @Autowired
+    private TagService tagService;
 
+    @GetMapping("/user/{userId}")
+    public List<Tag> getUserTags(@PathVariable String userId) {
+        return tagService.getTagsByUserId(userId);
+    }
 }
 
