@@ -64,7 +64,7 @@ public class UserController {
     }
 
     @ApiOperation("更新用户签名")
-    @PostMapping("/updateSignature/{user_id}")
+    @PostMapping("/updateSignature/{userId}")
     public R updateSignature(@PathVariable String userId, @RequestBody User user){
         log.info("执行更新用户签名的接口");
         User userSelected = userService.getById(userId);
@@ -74,7 +74,7 @@ public class UserController {
     }
 
     @ApiOperation("更新用户头像")
-    @PostMapping("/updateAvatar/{user_id}")
+    @PostMapping("/updateAvatar/{userId}")
     public R updateAvatar(@PathVariable String userId, MultipartFile file){
         log.info("执行更新用户头像的接口");
         User userSelected = userService.getById(userId);
@@ -86,7 +86,7 @@ public class UserController {
     }
 
     @ApiOperation("通过id获取详细用户信息")
-    @GetMapping("/getUserById/{user_id}")
+    @GetMapping("/getUserById/{userId}")
     public R getUserById(@PathVariable String userId){
         log.info("执行通过id获取详细用户信息的接口");
         User userSelected = userService.getById(userId);
