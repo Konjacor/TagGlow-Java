@@ -47,6 +47,18 @@ public class VivoAiServiceImpl implements VivoAiService {
         }
         return null;
     }
+    //生成旅游攻略的
+    public String generateTravelGuide(String inputForModel) {
+        try {
+            // 调用 vivogpt 方法生成 AI 响应
+            String aiResponse = vivogpt(inputForModel, VivoAiPromptConstant.NOTE_TO_TRAVEL_GUIDE_SYSTEM_PROMPT);
+            // 从 AI 响应中提取内容
+            return getContentFromAiResponse(aiResponse);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null; // 或者抛出自定义异常
+        }
+    }
 
 
     private String getContentFromAiResponse(String aiResponse) throws JsonProcessingException {

@@ -116,7 +116,7 @@ public class NoteController {
 
         return R.ok().data("totalNotes", totalNotes);
     }
-    @ApiOperation("统计有地址的笔记数量(用”.“来判断，若有则说明是有地址的，若没有就这个值是null)")
+    @ApiOperation("统计有地址的笔记数量")
     @GetMapping("/notesWithAddress/{user_id}")
     public R getNotesWithAddress(@PathVariable String userId) {
         log.info("统计有地址的笔记数量，用户ID: {}", userId);
@@ -131,7 +131,7 @@ public class NoteController {
         return R.ok().data("notesWithAddress", notesWithAddress);
     }
 
-    @ApiOperation("获取最新写的笔记（返回笔记id）")
+    @ApiOperation("获取最新写的笔记")
     @GetMapping("/latestNote/{user_id}")
     public R getLatestNote(@PathVariable String userId) {
         log.info("获取最新写的笔记，用户ID: {}", userId);
@@ -146,7 +146,7 @@ public class NoteController {
         return latestNote != null ? R.ok().data("latestNoteId", latestNote.getId()) : R.error().message("没有笔记");
     }
 
-    @ApiOperation("获取最新写的且有地址的笔记（返回笔记id）")
+    @ApiOperation("获取最新且有地址的笔记")
     @GetMapping("/latestNoteWithAddress/{user_id}")
     public R getLatestNoteWithAddress(@PathVariable String userId) {
         log.info("获取最新写的且有地址的笔记，用户ID: {}", userId);
@@ -180,7 +180,7 @@ public class NoteController {
             return R.error().message("添加笔记时发生异常: " + e.getMessage());
         }
     }
-    @ApiOperation("生成旅游攻略(未成功，等我明天改改)")
+    @ApiOperation("生成旅游攻略")
     @PostMapping("/generateTravelGuide")
     public R generateTravelGuide(@RequestParam String userId, @RequestBody List<String> noteIds) {
         log.info("生成旅游攻略，用户ID: {}, 笔记ID列表: {}", userId, noteIds);
@@ -199,14 +199,16 @@ public class NoteController {
         }
         MapController mapController = new MapController();
         // 第二步：为 Vivo AI 模型准备输入
-        StringBuilder inputForModel = new StringBuilder("以下是几篇笔记内容，请结合内容生成一篇有趣的旅游攻略：\n");
+        StringBuilder inputForModel = new StringBuilder("以下是几篇笔记内容，请结合内容生成一篇有趣的旅游攻略，通过模仿小红书/大众点评网友那种活泼、实用、充满种草感的风格，实用信息一定要醒目。像交通方式、门票价格这些，比如地铁标志后面写线路，钱袋符号后面写费用，避免写成官方介绍那种冷冰冰的语气，多用人称代词“我”和“你”，制造对话感。比如“相信我”、“你绝对会爱上”这样的句式。开头用一个吸引眼球的标题和引言，然后分几个板块介绍亮点。每个板块都要突出“最”字——比如“最出片的地方”、“最不能错过的美食”。最后加上实用小贴士，这样信息全面又容易阅读。。：\n");
         for (Note note : notes) {
             inputForModel.append("内容: ").append(note.getContent()).append("\n");
             if (note.getPosition() != null) {
                 // 调用 MapController 中的 reverseGeocodeByPosition 方法
                 log.info("now1");
                 String address = String.valueOf(mapController.reverseGeocodeByPosition(note.getPosition()));
+                log.info("address：{}",address);
                 inputForModel.append("位置: ").append(address).append("\n");
+
             }
             inputForModel.append("天气: ").append(note.getWeather()).append("\n");
             inputForModel.append("时间: ").append(note.getTime()).append("\n\n");
@@ -216,11 +218,10 @@ public class NoteController {
         // 第三步：调用 Vivo AI 模型生成旅游攻略
         String travelGuide;
         try {
-            travelGuide=null;
-//            String aiResponse = vivoAiService.vivogpt(inputForModel.toString(), VivoAiPromptConstant.NOTE_TO_TAGS_SYSTEM_PROMPT);
-//            travelGuide = vivoAiService.getContentFromAiResponse(aiResponse);
+            // 调用 VivoAiService 的新方法
+            travelGuide = vivoAiService.generateTravelGuide(inputForModel.toString());
         } catch (Exception e) {
-            log.error("调用Vivo AI模型生成旅游攻略失败: {}", e.getMessage(), e);
+            log.error("调用 Vivo AI 模型生成旅游攻略失败: {}", e.getMessage(), e);
             return R.error().message("生成旅游攻略失败: " + e.getMessage());
         }
         // 第四步：将旅游攻略字符串返回给前端

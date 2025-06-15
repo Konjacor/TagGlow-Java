@@ -14,4 +14,5 @@ public interface VivoAiService {
     List<Tag> getTagsByContent(String content);
 
 
+    String generateTravelGuide(String toString);
 }
