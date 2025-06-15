@@ -48,7 +48,7 @@ public class UserController {
     @ApiOperation("用户注册")
     @PostMapping("/register")
     public  R register(@RequestBody User user){
-        log.info("执行用户登录接口");
+        log.info("执行用户注册接口");
         //先查输入的注册用户名是否存在
         QueryWrapper<User> wrapper = new QueryWrapper<>();
         wrapper.eq("username",user.getUsername());

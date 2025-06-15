@@ -21,6 +21,7 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         // 填充创建时间和修改时间
         this.setFieldValByName("gmtCreate", new Date(), metaObject);
         this.setFieldValByName("gmtModified", new Date(), metaObject);
+        this.setFieldValByName("isDeleted", 0, metaObject);
 
         // 从 position 字段获取经纬度信息
         Object posObj = getFieldValByName("position", metaObject);
