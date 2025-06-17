@@ -44,6 +44,7 @@ CREATE TABLE `note`  (
   `time` datetime(0) NOT NULL COMMENT '记笔记时的时间',
   `gmt_create` datetime(0) NOT NULL COMMENT '记录创建时间',
   `gmt_modified` datetime(0) NOT NULL COMMENT '记录修改时间',
+  `classification` integer NOT NULL COMMENT '笔记分类：0学习 1工作 2日常 3生活 4旅行 5情感 6美食',
   `is_deleted` int(11) NOT NULL COMMENT '是否被逻辑删除 0-否 1-是',
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;

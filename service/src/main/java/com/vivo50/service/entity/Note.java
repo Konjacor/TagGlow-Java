@@ -44,6 +44,9 @@ public class Note implements Serializable {
     @ApiModelProperty(value = "记笔记时的天气信息")
     private String weather;
 
+    @ApiModelProperty(value = "笔记主题")
+    private Integer classification;
+
     @ApiModelProperty(value = "记笔记时的时间")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "GMT+8")
     private Date time;
@@ -57,6 +60,7 @@ public class Note implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "GMT+8")
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private Date gmtModified;
+
 
     @ApiModelProperty(value = "是否被逻辑删除 0-否 1-是")
     @TableField(value = "is_deleted", fill = FieldFill.INSERT)
