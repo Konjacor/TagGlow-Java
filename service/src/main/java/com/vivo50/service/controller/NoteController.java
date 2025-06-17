@@ -189,6 +189,40 @@ public class NoteController {
         log.info("Fetched notes: {}", latestNoteWithAddress);
         return latestNoteWithAddress != null ? R.ok().data("latestNoteWithAddressId", latestNoteWithAddress.getId()) : R.error().message("没有有地址的笔记");
     }
+    @ApiOperation("一键生成笔记内容")
+    @PostMapping("/generation")
+    public R generation(@RequestParam String tags) {
+        log.info("标签内容：{}" , tags);
+        try {
+            StringBuilder inputForModel = new StringBuilder("我会给你3-5个标签，请你生成180字内的生活片段随笔，要求：\n" +
+                    "1. **文风**：像朋友发微信语音般自然\n" +
+                    "2. **内容**：\n" +
+                    "   - 70% 真实感受（别用\"惆怅\"\"寂寥\"等文言词，改用\"心里空落落\"等表达）\n" +
+                    "   - 30% 场景白描（如#国贸写\"写字楼格子间还亮着几盏惨白的灯\"等表达方式）\n" +
+                    "   (可选) 10% 希望表达（如#夜晚好冷\"突然觉得，要是这时候有人递杯热咖啡，该多好。\"）\n"+
+                    "3. **禁忌**：\n" +
+                    "   × 堆砌形容词 × 强行升华 × 超过180字\n" +
+                    "\n" +
+                    "示例：\n" +
+                    "输入标签：#误车 #广州南站 #暴雨  \n" +
+                    "输出：\n" +
+                    "\"手机弹出晚点通知时，雨正泼在高铁站玻璃顶上。  \n" +
+                    "充电口挤满焦虑的打工仔，泡面味混着潮湿的袜子味。  \n" +
+                    "想起出门前我妈喊『带伞』，当时还嫌烦。  \n" +
+                    "现在看着窗外模糊的霓虹灯，突然特别想吃她煮的姜汤面。"+
+                    "这是下面是我的tag，按照上面提示直接给我随笔"+tags);
+            // Step 4: Generate tags
+            String generatedTags = vivoAiService.generateRespons(inputForModel.toString());
+            // Step 7: Return validated tags
+            return R.ok().message("一键生成笔记内容成功").data("NoteDefaultaitag", generatedTags);
+        } catch (IllegalArgumentException e) {
+            log.error("输入参数错误: {}", e.getMessage(), e);
+            return R.error().message("输入参数错误: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("一键生成笔记内容失败: {}", e.getMessage(), e);
+            return R.error().message("一键生成笔记内容发生异常: " + e.getMessage());
+        }
+    }
     @ApiOperation("生成笔记的默认AI标签")
     @PostMapping("/NoteDefaultaitag")
     public R NoteDefaultaitag(@RequestParam String userId, @RequestParam String position, @RequestParam int classification) {
