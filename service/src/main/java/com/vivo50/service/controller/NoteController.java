@@ -162,24 +162,73 @@ public class NoteController {
         log.info("Fetched notes: {}", latestNoteWithAddress);
         return latestNoteWithAddress != null ? R.ok().data("latestNoteWithAddressId", latestNoteWithAddress.getId()) : R.error().message("没有有地址的笔记");
     }
-    @ApiOperation("添加新笔记")
-    @PostMapping("/addNote")
-    public R addNote(@RequestBody Note note) {
-        log.info("添加新笔记，用户ID: {}", note.getUserId());
+    @ApiOperation("生成笔记的默认AI标签")
+    @PostMapping("/NoteDefaultaitag")
+    public R NoteDefaultaitag(@RequestParam String userId, @RequestParam String position, @RequestParam int classification) {
+        log.info("笔记默认AI标签生成，用户ID: {}, 位置: {}, 分类: {}", userId, position, classification);
         try {
-            // 设置创建时间和逻辑删除标志
-            note.setGmtCreate(new Date());
-            note.setGmtModified(new Date());
-            note.setTime(new Date());
-            note.setIsDeleted(0);
-            log.info("now");
-            boolean isSaved = noteService.save(note);
-            return isSaved ? R.ok().message("笔记添加成功") : R.error().message("笔记添加失败");
+            // Step 1: Get current time
+            R timeResponse = getCurrentBeijingTime();
+            String time = (String) timeResponse.getData().get("time");
+
+            // Step 2: Get location, weather, and classification name
+            MapController mapController = new MapController();
+            R locationResponse = mapController.reverseGeocodeByPosition(position);
+            R weatherResponse = mapController.getWeatherByPosition(position);
+            String classificationName = getClassificationName(classification);
+
+            // Step 3: Construct input for AI model
+            StringBuilder inputForModel = new StringBuilder("请基于用户输入的{主题}、{位置}、{时间}、{天气}四要素生成标签，严格遵循：\n" +
+                    "1. 标签格式：以#开头，中文，长度≤8字\n" +
+                    "2. 数量限制：3-5个标签\n" +
+                    "3. 内容维度：\n" +
+                    "   - 必须包含1个时间/主题融合标签（例：#深夜加班）\n" +
+                    "   - 必须包含2个地点标签：①城市级（#北京）②最小单位（#京东大厦）\n" +
+                    "   - 可选1个天气关联标签（例：#暴雨通勤）\n" +
+                    "   - 可选1个情绪/状态标签（例：#高效专注）\n" +
+                    "4. 禁止出现：区/街道级地名、英文、标点符号\n" +
+                    "\n" +
+                    "生成示例：\n" +
+                    "输入：主题=工作 位置=北京市朝阳区京东大厦 时间=23:00 天气=晴\n" +
+                    "输出：#熬夜工作 #北京 #京东大厦 #高效夜班\n");
+            inputForModel.append("位置: ").append(locationResponse).append("\n");
+            inputForModel.append("天气: ").append(weatherResponse).append("\n");
+            inputForModel.append("时间: ").append(time).append("\n");
+            inputForModel.append("笔记主题: ").append(classificationName).append("\n");
+
+            // Step 4: Generate tags
+            String generatedTags = vivoAiService.generateRespons(inputForModel.toString());
+
+            // Step 5: Validate generated tags
+            String validationInput = "请验证以下标签是否符合要求：" +
+                    "1. 标签格式：以#开头，中文，长度≤8字\n" +
+                    "2. 数量限制：3-5个标签\n" +
+                    "3. 内容维度：\n" +
+                    "   - 必须包含1个时间/主题融合标签\n" +
+                    "   - 必须包含2个地点标签\n" +
+                    "   - 可选1个天气关联标签\n" +
+                    "   - 可选1个情绪/状态标签\n" +
+                    "4. 禁止出现：区/街道级地名、英文、标点符号\n" +
+                    "\n" +
+                    "之前生成的标签: " + generatedTags +"如果有问题，请你只返回给我更好的标签\n";
+            String validationResponse = vivoAiService.generateRespons(validationInput);
+
+            // Step 6: Check validation result
+            if (validationResponse.contains("不符合") || validationResponse.contains("错误")) {
+                return R.error().message("生成的标签未通过验证: " + validationResponse);
+            }
+
+            // Step 7: Return validated tags
+            return R.ok().message("笔记默认AI标签生成成功").data("NoteDefaultaitag", generatedTags);
+        } catch (IllegalArgumentException e) {
+            log.error("输入参数错误: {}", e.getMessage(), e);
+            return R.error().message("输入参数错误: " + e.getMessage());
         } catch (Exception e) {
-            log.error("添加笔记失败: {}", e.getMessage(), e);
-            return R.error().message("添加笔记时发生异常: " + e.getMessage());
+            log.error("笔记默认AI标签生成失败: {}", e.getMessage(), e);
+            return R.error().message("笔记默认AI标签生成时发生异常: " + e.getMessage());
         }
     }
+
     @ApiOperation("生成旅游攻略")
     @PostMapping("/generateTravelGuide")
     public R generateTravelGuide(@RequestParam String userId, @RequestBody List<String> noteIds) {
@@ -199,7 +248,7 @@ public class NoteController {
         }
         MapController mapController = new MapController();
         // 第二步：为 Vivo AI 模型准备输入
-        StringBuilder inputForModel = new StringBuilder("以下是几篇笔记内容，请结合内容生成一篇有趣的旅游攻略，通过模仿小红书/大众点评网友那种活泼、实用、充满种草感的风格，实用信息一定要醒目。像交通方式、门票价格这些，比如地铁标志后面写线路，钱袋符号后面写费用，避免写成官方介绍那种冷冰冰的语气，多用人称代词“我”和“你”，制造对话感。比如“相信我”、“你绝对会爱上”这样的句式。开头用一个吸引眼球的标题和引言，然后分几个板块介绍亮点。每个板块都要突出“最”字——比如“最出片的地方”、“最不能错过的美食”。最后加上实用小贴士，这样信息全面又容易阅读。。：\n");
+        StringBuilder inputForModel = new StringBuilder("以下是几篇笔记内容，请结合内容生成一篇有趣的旅游攻略，通过模仿小红书/大众点评网友那种活泼、实用、充满种草感的风格，实用信息一定要醒目。像交通方式、门票价格这些，比如地铁标志后面写线路，钱袋符号后面写费用，避免写成官方介绍那种冷冰冰的语气，多用人称代词“我”和“你”，制造对话感。比如“相信我”、“你绝对会爱上”这样的句式。开头用一个吸引眼球的标题和引言，然后分几个板块介绍亮点。每个板块都要突出“最”字——比如“最出片的地方”、“最不能错过的美食”。最后加上实用小贴士，这样信息全面又容易阅读。字数控制在350以内。：\n");
         for (Note note : notes) {
             inputForModel.append("内容: ").append(note.getContent()).append("\n");
             if (note.getPosition() != null) {
@@ -219,7 +268,7 @@ public class NoteController {
         String travelGuide;
         try {
             // 调用 VivoAiService 的新方法
-            travelGuide = vivoAiService.generateTravelGuide(inputForModel.toString());
+            travelGuide = vivoAiService.generateRespons(inputForModel.toString());
         } catch (Exception e) {
             log.error("调用 Vivo AI 模型生成旅游攻略失败: {}", e.getMessage(), e);
             return R.error().message("生成旅游攻略失败: " + e.getMessage());
@@ -407,6 +456,43 @@ public class NoteController {
         }
     }
 
+
+    @ApiOperation("获取用户特定分类笔记数量")
+    @GetMapping("/getNoteCountByClassification")
+    public R getNoteCountByClassification(@RequestParam String userId, @RequestParam int classification) {
+        log.info("获取用户特定分类笔记数量，用户ID: {}, 分类: {}", userId, classification);
+
+        QueryWrapper<Note> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("user_id", userId)
+                .eq("classification", classification)
+                .eq("is_deleted", 0); // Ensure only non-deleted notes are counted
+
+        int count = noteService.count(queryWrapper);
+
+        return R.ok().data("classification", classification).data("count", count);
+    }
+    @ApiOperation("根据classification获取其主题名字")
+    @GetMapping("/getClassificationName/{classification}")
+    public String getClassificationName(int classification) {
+        switch (classification) {
+            case 0:
+                return "学习";
+            case 1:
+                return "工作";
+            case 2:
+                return "日常";
+            case 3:
+                return "生活";
+            case 4:
+                return "旅行";
+            case 5:
+                return "情感";
+            case 6:
+                return "美食";
+            default:
+                return "未知分类";
+        }
+    }
     // 根据 weathercode 返回中文天气描述
     private String getWeatherDescription(int code) {
         switch (code) {
