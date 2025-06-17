@@ -47,8 +47,8 @@ public class VivoAiServiceImpl implements VivoAiService {
         }
         return null;
     }
-    //生成旅游攻略的
-    public String generateTravelGuide(String inputForModel) {
+    //得到AI回复
+    public String generateRespons(String inputForModel) {
         try {
             // 调用 vivogpt 方法生成 AI 响应
             String aiResponse = vivogpt(inputForModel, VivoAiPromptConstant.NOTE_TO_TRAVEL_GUIDE_SYSTEM_PROMPT);
