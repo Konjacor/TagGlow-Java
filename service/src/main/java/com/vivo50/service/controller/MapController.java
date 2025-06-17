@@ -11,6 +11,8 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
@@ -137,7 +139,7 @@ public class MapController {
 
         return R.ok().data("layerUrls", layerUrls);
     }
-    @ApiOperation("前端传来设备经纬度，后端根据经纬度进行逆地理编码（天地图的）")
+    @ApiOperation("根据经纬度获取地点信息")
     @GetMapping("/reverseGeocodeByPosition")
     public R reverseGeocodeByPosition(@RequestParam String position) {
         try {
@@ -174,6 +176,73 @@ public class MapController {
             return R.error().message("位置格式错误，无法解析经纬度: " + e.getMessage());
         } catch (Exception e) {
             return R.error().message("获取位置信息失败: " + e.getMessage());
+        }
+    }
+    @ApiOperation("根据经纬度获取天气信息")
+    @GetMapping("/getWeatherByPosition")
+    public R getWeatherByPosition(@RequestParam String position) {
+        try {
+            MapController mapController=new MapController();
+            // Step 1: 调用 reverseGeocodeByPosition 获取地理位置信息
+            R locationResponse = mapController.reverseGeocodeByPosition(position);
+            log.info("locationResponse: {}", locationResponse);
+            if (locationResponse.getSuccess()==false ) {
+                return R.error().message("获取地理位置信息失败: " + (locationResponse != null ? locationResponse.getMessage() : "响应为空"));
+            }
+            // Step 2: 根据经纬度直接获取天气信息
+            String[] coordinates = position.split(",");
+            if (coordinates.length != 2) {
+                return R.error().message("位置格式错误，应为 'longitude,latitude'");
+            }
+
+            double latitude = Double.parseDouble(coordinates[1].trim());
+            double longitude = Double.parseDouble(coordinates[0].trim());
+
+            String weatherUrl = String.format(
+                    "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current_weather=true",
+                    latitude, longitude
+            );
+
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<Map> weatherResponse = restTemplate.getForEntity(weatherUrl, Map.class);
+
+            if (weatherResponse.getStatusCode() == HttpStatus.OK && weatherResponse.getBody() != null) {
+                Map body = weatherResponse.getBody();
+                Map currentWeather = (Map) body.get("current_weather");
+                if (currentWeather != null) {
+                    double temperature = (double) currentWeather.get("temperature");
+                    int weatherCode = (int) currentWeather.get("weathercode");
+
+                    String weatherDesc = getWeatherDescription(weatherCode);
+                    String weather = String.format("%s, 温度: %.1f°C", weatherDesc, temperature);
+
+                    // Step 3: 返回该地理位置的天气信息
+                    return R.ok().data("weather:", weather);
+                }
+            }
+            return R.error().message("无法获取天气信息");
+        } catch (NumberFormatException e) {
+            return R.error().message("位置格式错误，无法解析经纬度: " + e.getMessage());
+        } catch (Exception e) {
+            return R.error().message("获取天气信息时发生异常: " + e.getMessage());
+        }
+    }
+    private String getWeatherDescription(int code) {
+        switch (code) {
+            case 0: return "晴";
+            case 1: case 2: return "多云";
+            case 3: return "阴";
+            case 45: case 48: return "有雾";
+            case 51: case 53: case 55: return "小雨";
+            case 61: case 63: case 65: return "中到大雨";
+            case 66: case 67: return "冻雨";
+            case 71: case 73: case 75: return "小雪";
+            case 77: return "阵雪";
+            case 80: case 81: case 82: return "阵雨";
+            case 85: case 86: return "大雪";
+            case 95: return "雷雨";
+            case 96: case 99: return "强雷雨";
+            default: return "未知";
         }
     }
 }
