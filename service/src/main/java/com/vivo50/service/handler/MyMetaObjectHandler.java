@@ -22,7 +22,7 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         this.setFieldValByName("gmtCreate", new Date(), metaObject);
         this.setFieldValByName("gmtModified", new Date(), metaObject);
         this.setFieldValByName("isDeleted", 0, metaObject);
-
+        Object weatherObj = getFieldValByName("weather", metaObject);
         // 从 position 字段获取经纬度信息
         Object posObj = getFieldValByName("position", metaObject);
         if (posObj instanceof String) {
@@ -36,7 +36,7 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
                 } catch (NumberFormatException e) {
                     this.setFieldValByName("weather", "位置格式错误", metaObject);
                 }
-            } else {
+            } else if(weatherObj==null){
                 this.setFieldValByName("weather", "位置缺失", metaObject);
             }
         } else {
