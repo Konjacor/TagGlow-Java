@@ -244,24 +244,65 @@ public class NoteController {
 
         return result ? R.ok().message("删除成功") : R.error().message("删除失败");
     }
-    @ApiOperation("批量获取用户笔记内容")
+    @ApiOperation("批量获取用户笔记及Tag")
     @PostMapping("/getNotesByIds")
     public R getNotesByIds(@RequestParam String userId, @RequestBody List<String> noteIds) {
         log.info("批量获取用户笔记内容，用户ID: {}, 笔记ID列表: {}", userId, noteIds);
         if (noteIds == null || noteIds.isEmpty()) {
             return R.error().message("笔记ID列表不能为空");
         }
-        QueryWrapper<Note> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("user_id", userId)
+
+        // 查询笔记
+        QueryWrapper<Note> noteQuery = new QueryWrapper<>();
+        noteQuery.eq("user_id", userId)
                 .in("id", noteIds)
                 .eq("is_deleted", 0);
-        List<Note> notes = noteService.list(queryWrapper);
+        List<Note> notes = noteService.list(noteQuery);
+
         if (notes.isEmpty()) {
             return R.error().message("未找到对应的笔记");
         }
-        log.info("笔记列表: {}", notes);
-        return R.ok().data("notes", notes);
+
+        // 提取所有笔记ID
+        List<String> foundNoteIds = notes.stream()
+                .map(Note::getId)
+                .collect(Collectors.toList());
+
+        // 查询笔记-标签关系
+        QueryWrapper<NoteTagRelation> relQuery = new QueryWrapper<>();
+        relQuery.in("note_id", foundNoteIds);
+        List<NoteTagRelation> relations = noteTagRelationService.list(relQuery);
+
+        // 提取所有 tagId
+        Set<String> tagIds = relations.stream()
+                .map(NoteTagRelation::getTagId)
+                .collect(Collectors.toSet());
+
+        // 查询标签信息
+        List<Tag> tags = (List<Tag>) tagService.listByIds(tagIds);
+        Map<String, Tag> tagMap = tags.stream()
+                .collect(Collectors.toMap(Tag::getId, tag -> tag));
+
+        // 构建 noteId -> List<Tag> 映射
+        Map<String, List<Tag>> noteIdToTags = new HashMap<>();
+        for (NoteTagRelation rel : relations) {
+            noteIdToTags.computeIfAbsent(rel.getNoteId(), k -> new ArrayList<>())
+                    .add(tagMap.get(rel.getTagId()));
+        }
+
+        // 构建结果对象列表
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        for (Note note : notes) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("note", note);
+            map.put("tags", noteIdToTags.getOrDefault(note.getId(), Collections.emptyList()));
+            resultList.add(map);
+        }
+
+        log.info("笔记及标签列表: {}", resultList);
+        return R.ok().data("notes", resultList);
     }
+
     @ApiOperation("批量更新用户笔记内容")
     @PostMapping("/updateNotes")
     public R updateNotes(@RequestBody Map<String, Object> requestData) {
