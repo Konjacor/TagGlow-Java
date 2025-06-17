@@ -63,47 +63,74 @@ public class NoteController {
     @Autowired
     VivoAiService vivoAiService;
 
-    @ApiOperation("保存笔记提取标签保存标签")
+    @ApiOperation("保存笔记及标签，并生成AI回复")
     @PostMapping("/saveNote")
-    public R saveNote(@RequestBody Note note) {
-        log.info("保存笔记提取标签保存标签");
+    public R saveNote(@RequestBody Note note, @RequestParam List<String> tagList) {
+        log.info("保存笔记及标签：{}", note.getContent());
+
+        // 1. 保存笔记（包括 content、userId、position、weather、classification）
         boolean check = noteService.save(note);
-        if(!check) return R.error().message("笔记保存失败");
-        List<Tag> tags = vivoAiService.getTagsByContent(note.getContent());
+        if (!check) return R.error().message("笔记保存失败");
+
+        // 2. 处理标签及关系
         List<NoteTagRelation> noteTagRelations = new ArrayList<>();
         List<UserTagRelation> userTagRelations = new ArrayList<>();
-        for(Tag tag : tags) {//如果对应标签-类型对已经存在，则直接记录已存在的id，如果不存在，则保存，保存后id会回写给tag对象
+
+        for (String tagContent : tagList) {
+            // 检查标签是否已存在
             QueryWrapper<Tag> queryWrapper = new QueryWrapper<>();
-            queryWrapper.eq("content", tag.getContent()).eq("type", tag.getType());
-            Tag tagSelect = tagService.getOne(queryWrapper);
-            if(tagSelect != null) {
-                tag.setId(tagSelect.getId());
-            } else {
+            queryWrapper.eq("content", tagContent);
+            Tag tag = tagService.getOne(queryWrapper);
+
+            if (tag == null) {
+                // 不存在则创建新标签
+                tag = new Tag();
+                tag.setContent(tagContent);
+                tag.setType(""); // 或者 "default"
                 check = tagService.save(tag);
-                if(!check) return R.error().message("标签保存失败");
+                if (!check) return R.error().message("标签保存失败");
             }
+
+            // 建立 Note-Tag 关系
             NoteTagRelation noteTagRelation = new NoteTagRelation();
             noteTagRelation.setNoteId(note.getId());
             noteTagRelation.setTagId(tag.getId());
             noteTagRelations.add(noteTagRelation);
-            UserTagRelation userTagRelation = new UserTagRelation();
-            userTagRelation.setUserId(note.getUserId());
-            userTagRelation.setTagId(tag.getId());
-            userTagRelations.add(userTagRelation);
-        }
-        check = noteTagRelationService.saveBatch(noteTagRelations);
-        if(!check) return R.error().message("笔记-标签关系保存失败");
-        for(UserTagRelation userTagRelation : userTagRelations) {
-            QueryWrapper<UserTagRelation> queryWrapper = new QueryWrapper<>();
-            queryWrapper.eq("user_id", userTagRelation.getUserId()).eq("tag_id", userTagRelation.getTagId());
-            UserTagRelation userTagRelationSelect = userTagRelationService.getOne(queryWrapper);
-            if(userTagRelationSelect == null) {
-                check = userTagRelationService.save(userTagRelation);
-                if(!check) return R.error().message("用户-标签关系保存失败");
+
+            // 检查并建立 User-Tag 关系（避免重复）
+            QueryWrapper<UserTagRelation> userTagWrapper = new QueryWrapper<>();
+            userTagWrapper.eq("user_id", note.getUserId()).eq("tag_id", tag.getId());
+            if (userTagRelationService.getOne(userTagWrapper) == null) {
+                UserTagRelation userTagRelation = new UserTagRelation();
+                userTagRelation.setUserId(note.getUserId());
+                userTagRelation.setTagId(tag.getId());
+                userTagRelations.add(userTagRelation);
             }
         }
-        return R.ok().message("保存成功");
+
+        // 批量保存关系
+        if (!noteTagRelations.isEmpty() && !noteTagRelationService.saveBatch(noteTagRelations)) {
+            return R.error().message("笔记-标签关系保存失败");
+        }
+        if (!userTagRelations.isEmpty() && !userTagRelationService.saveBatch(userTagRelations)) {
+            return R.error().message("用户-标签关系保存失败");
+        }
+
+        // 3. 调用 vivoAI 回复内容（不保存，只返回）
+        String aiReply;
+        try {
+            aiReply = vivoAiService.generateRespons(note.getContent());
+            log.info("AI 回复内容：{}", aiReply);
+        } catch (Exception e) {
+            log.error("调用 vivoAI 失败", e);
+            aiReply = "AI 回复生成失败";
+        }
+
+        // 4. 返回结果
+        return R.ok().message("笔记保存成功").data("aiReply", aiReply);
     }
+
+
     @ApiOperation("统计总笔记数量")
     @GetMapping("/totalNotes/{user_id}")
     public R getTotalNotes(@PathVariable String userId) {
