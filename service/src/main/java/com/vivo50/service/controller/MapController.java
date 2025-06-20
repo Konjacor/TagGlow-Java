@@ -41,7 +41,7 @@ public class MapController {
     private String tiandituApiKey;
     @ApiOperation("获取用户笔记地图标记")
     @GetMapping("/mapMarkers")
-    public R getMapMarkers(@RequestParam String userId, @RequestParam(required = false, defaultValue = "false") boolean includeImages) {
+    public R getMapMarkers(@RequestParam String userId) {
         log.info("获取用户笔记地图标记，用户ID: {}", userId);
 
         // 查询用户的所有笔记（排除已删除的）
@@ -83,18 +83,6 @@ public class MapController {
             marker.put("weather", note.getWeather());
             marker.put("time", note.getTime().getTime()); // 时间戳
 
-            // 根据参数决定是否包含图片信息
-            if (includeImages) {
-                QueryWrapper<Picture> pictureWrapper = new QueryWrapper<>();
-                pictureWrapper.eq("note_id", note.getId())
-                        .eq("is_deleted", 0);
-                List<Picture> pictures = pictureService.list(pictureWrapper);
-
-                if (!pictures.isEmpty()) {
-                    marker.put("imageUrl", pictures.get(0).getContent());
-                }
-            }
-
             return marker;
         }).collect(Collectors.toList());
 
@@ -126,18 +114,56 @@ public class MapController {
 
         return R.ok().data(response);
     }
-    @ApiOperation("获取天地图图层服务URL模板（简易地图内容）")
-    @GetMapping("/layerService")
-    public R getLayerService() {
-        log.info("获取天地图图层服务URL模板");
+    @ApiOperation("获取地图数据（图层服务和标记）")
+    @GetMapping("/mapData")
+    public R getMapData(@RequestParam String userId) {
+        log.info("获取地图数据，用户ID: {}", userId);
 
-        // 天地图图层服务URL模板
+        // 获取天地图图层服务URL模板
         Map<String, String> layerUrls = new HashMap<>();
         layerUrls.put("vector", "http://t{0-7}.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=" + tiandituApiKey);
         layerUrls.put("satellite", "http://t{0-7}.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=" + tiandituApiKey);
         layerUrls.put("terrain", "http://t{0-7}.tianditu.gov.cn/DataServer?T=ter_w&x={x}&y={y}&l={z}&tk=" + tiandituApiKey);
 
-        return R.ok().data("layerUrls", layerUrls);
+        // 获取用户笔记的地图标记
+        QueryWrapper<Note> noteWrapper = new QueryWrapper<>();
+        noteWrapper.eq("user_id", userId).eq("is_deleted", 0);
+        List<Note> notes = noteService.list(noteWrapper);
+
+        // 构建地图标记数据
+        List<Map<String, Object>> markers = notes.stream().map(note -> {
+            Map<String, Object> marker = new HashMap<>();
+            marker.put("id", note.getId());
+            marker.put("title", "笔记位置");
+
+            // 解析位置信息 (格式: 经度,纬度)
+            String position = note.getPosition();
+            if (position != null && !position.isEmpty()) {
+                String[] coords = position.split(",");
+                if (coords.length == 2) {
+                    try {
+                        marker.put("longitude", Double.parseDouble(coords[0].trim()));
+                        marker.put("latitude", Double.parseDouble(coords[1].trim()));
+                    } catch (NumberFormatException e) {
+                        log.warn("Invalid position format for note ID {}: {}", note.getId(), position);
+                    }
+                }
+            }
+
+            // 添加笔记基本信息
+            marker.put("content", note.getContent());
+            marker.put("weather", note.getWeather());
+            marker.put("time", note.getTime().getTime()); // 时间戳
+
+            return marker;
+        }).collect(Collectors.toList());
+
+        // 构建响应数据
+        Map<String, Object> response = new HashMap<>();
+        response.put("layerUrls", layerUrls);
+        response.put("markers", markers);
+
+        return R.ok().data(response);
     }
     @ApiOperation("根据经纬度获取地点信息")
     @GetMapping("/reverseGeocodeByPosition")
