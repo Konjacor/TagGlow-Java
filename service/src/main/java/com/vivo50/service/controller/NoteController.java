@@ -119,7 +119,7 @@ public class NoteController {
         // 3. 调用 vivoAI 回复内容（不保存，只返回）
         String aiReply;
         try {
-            aiReply = vivoAiService.generateRespons(note.getContent());
+            aiReply = vivoAiService.generateResponse(note.getContent());
             log.info("AI 回复内容：{}", aiReply);
         } catch (Exception e) {
             log.error("调用 vivoAI 失败", e);

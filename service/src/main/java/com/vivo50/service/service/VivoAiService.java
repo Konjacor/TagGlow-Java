@@ -15,4 +15,6 @@ public interface VivoAiService {
 
 
     String generateRespons(String toString);
+
+    String generateResponse(String toString);
 }

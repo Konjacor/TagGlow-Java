@@ -60,6 +60,19 @@ public class VivoAiServiceImpl implements VivoAiService {
         }
     }
 
+    // AI回复用户的笔记内容
+    public String generateResponse(String inputForModel) {
+        try {
+            // 调用 vivogpt 方法生成 AI 响应
+            String aiResponse = vivogpt(inputForModel, VivoAiPromptConstant.NOTE_TO_REPLY_PROMPT);
+            // 从 AI 响应中提取内容
+            return getContentFromAiResponse(aiResponse);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null; // 或者抛出自定义异常
+        }
+    }
+
 
     private String getContentFromAiResponse(String aiResponse) throws JsonProcessingException {
         // 创建 ObjectMapper 实例
