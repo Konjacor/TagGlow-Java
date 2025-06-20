@@ -198,7 +198,7 @@ public class NoteController {
     }
     @ApiOperation("生成笔记的默认AI标签")
     @PostMapping("/NoteDefaultaitag")
-    public R NoteDefaultaitag(@RequestParam String userId, @RequestParam String position, @RequestParam int classification) {
+    public R NoteDefaultaitag(@RequestParam String userId, @RequestParam String position, @RequestParam Integer classification) {
         log.info("笔记默认AI标签生成，用户ID: {}, 位置: {}, 分类: {}", userId, position, classification);
         try {
             // Step 1: Get current time
@@ -221,10 +221,7 @@ public class NoteController {
                     "   - 可选1个天气关联标签（例：#暴雨通勤）\n" +
                     "   - 可选1个情绪/状态标签（例：#高效专注）\n" +
                     "4. 禁止出现：区/街道级地名、英文、标点符号\n" +
-                    "\n" +
-                    "生成示例：\n" +
-                    "输入：主题=工作 位置=北京市朝阳区京东大厦 时间=23:00 天气=晴\n" +
-                    "输出：#熬夜工作 #北京 #京东大厦 #高效夜班\n");
+                    "\n");
             inputForModel.append("位置: ").append(locationResponse).append("\n");
             inputForModel.append("天气: ").append(weatherResponse).append("\n");
             inputForModel.append("时间: ").append(time).append("\n");
@@ -507,7 +504,7 @@ public class NoteController {
     }
     @ApiOperation("根据classification获取其主题名字")
     @GetMapping("/getClassificationName/{classification}")
-    public String getClassificationName(int classification) {
+    public String getClassificationName(Integer classification) {
         switch (classification) {
             case 0:
                 return "学习";
