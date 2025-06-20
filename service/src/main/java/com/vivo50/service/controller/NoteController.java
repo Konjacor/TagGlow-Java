@@ -63,47 +63,74 @@ public class NoteController {
     @Autowired
     VivoAiService vivoAiService;
 
-    @ApiOperation("保存笔记提取标签保存标签")
+    @ApiOperation("保存笔记及标签，并生成AI回复")
     @PostMapping("/saveNote")
-    public R saveNote(@RequestBody Note note) {
-        log.info("保存笔记提取标签保存标签");
+    public R saveNote(@RequestBody Note note, @RequestParam List<String> tagList) {
+        log.info("保存笔记及标签：{}", note.getContent());
+
+        // 1. 保存笔记（包括 content、userId、position、weather、classification）
         boolean check = noteService.save(note);
-        if(!check) return R.error().message("笔记保存失败");
-        List<Tag> tags = vivoAiService.getTagsByContent(note.getContent());
+        if (!check) return R.error().message("笔记保存失败");
+
+        // 2. 处理标签及关系
         List<NoteTagRelation> noteTagRelations = new ArrayList<>();
         List<UserTagRelation> userTagRelations = new ArrayList<>();
-        for(Tag tag : tags) {//如果对应标签-类型对已经存在，则直接记录已存在的id，如果不存在，则保存，保存后id会回写给tag对象
+
+        for (String tagContent : tagList) {
+            // 检查标签是否已存在
             QueryWrapper<Tag> queryWrapper = new QueryWrapper<>();
-            queryWrapper.eq("content", tag.getContent()).eq("type", tag.getType());
-            Tag tagSelect = tagService.getOne(queryWrapper);
-            if(tagSelect != null) {
-                tag.setId(tagSelect.getId());
-            } else {
+            queryWrapper.eq("content", tagContent);
+            Tag tag = tagService.getOne(queryWrapper);
+
+            if (tag == null) {
+                // 不存在则创建新标签
+                tag = new Tag();
+                tag.setContent(tagContent);
+                tag.setType(""); // 或者 "default"
                 check = tagService.save(tag);
-                if(!check) return R.error().message("标签保存失败");
+                if (!check) return R.error().message("标签保存失败");
             }
+
+            // 建立 Note-Tag 关系
             NoteTagRelation noteTagRelation = new NoteTagRelation();
             noteTagRelation.setNoteId(note.getId());
             noteTagRelation.setTagId(tag.getId());
             noteTagRelations.add(noteTagRelation);
-            UserTagRelation userTagRelation = new UserTagRelation();
-            userTagRelation.setUserId(note.getUserId());
-            userTagRelation.setTagId(tag.getId());
-            userTagRelations.add(userTagRelation);
-        }
-        check = noteTagRelationService.saveBatch(noteTagRelations);
-        if(!check) return R.error().message("笔记-标签关系保存失败");
-        for(UserTagRelation userTagRelation : userTagRelations) {
-            QueryWrapper<UserTagRelation> queryWrapper = new QueryWrapper<>();
-            queryWrapper.eq("user_id", userTagRelation.getUserId()).eq("tag_id", userTagRelation.getTagId());
-            UserTagRelation userTagRelationSelect = userTagRelationService.getOne(queryWrapper);
-            if(userTagRelationSelect == null) {
-                check = userTagRelationService.save(userTagRelation);
-                if(!check) return R.error().message("用户-标签关系保存失败");
+
+            // 检查并建立 User-Tag 关系（避免重复）
+            QueryWrapper<UserTagRelation> userTagWrapper = new QueryWrapper<>();
+            userTagWrapper.eq("user_id", note.getUserId()).eq("tag_id", tag.getId());
+            if (userTagRelationService.getOne(userTagWrapper) == null) {
+                UserTagRelation userTagRelation = new UserTagRelation();
+                userTagRelation.setUserId(note.getUserId());
+                userTagRelation.setTagId(tag.getId());
+                userTagRelations.add(userTagRelation);
             }
         }
-        return R.ok().message("保存成功");
+
+        // 批量保存关系
+        if (!noteTagRelations.isEmpty() && !noteTagRelationService.saveBatch(noteTagRelations)) {
+            return R.error().message("笔记-标签关系保存失败");
+        }
+        if (!userTagRelations.isEmpty() && !userTagRelationService.saveBatch(userTagRelations)) {
+            return R.error().message("用户-标签关系保存失败");
+        }
+
+        // 3. 调用 vivoAI 回复内容（不保存，只返回）
+        String aiReply;
+        try {
+            aiReply = vivoAiService.generateRespons(note.getContent());
+            log.info("AI 回复内容：{}", aiReply);
+        } catch (Exception e) {
+            log.error("调用 vivoAI 失败", e);
+            aiReply = "AI 回复生成失败";
+        }
+
+        // 4. 返回结果
+        return R.ok().message("笔记保存成功").data("aiReply", aiReply);
     }
+
+
     @ApiOperation("统计总笔记数量")
     @GetMapping("/totalNotes/{user_id}")
     public R getTotalNotes(@PathVariable String userId) {
@@ -324,24 +351,65 @@ public class NoteController {
 
         return result ? R.ok().message("删除成功") : R.error().message("删除失败");
     }
-    @ApiOperation("批量获取用户笔记内容")
+    @ApiOperation("批量获取用户笔记及Tag")
     @PostMapping("/getNotesByIds")
     public R getNotesByIds(@RequestParam String userId, @RequestBody List<String> noteIds) {
         log.info("批量获取用户笔记内容，用户ID: {}, 笔记ID列表: {}", userId, noteIds);
         if (noteIds == null || noteIds.isEmpty()) {
             return R.error().message("笔记ID列表不能为空");
         }
-        QueryWrapper<Note> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("user_id", userId)
+
+        // 查询笔记
+        QueryWrapper<Note> noteQuery = new QueryWrapper<>();
+        noteQuery.eq("user_id", userId)
                 .in("id", noteIds)
                 .eq("is_deleted", 0);
-        List<Note> notes = noteService.list(queryWrapper);
+        List<Note> notes = noteService.list(noteQuery);
+
         if (notes.isEmpty()) {
             return R.error().message("未找到对应的笔记");
         }
-        log.info("笔记列表: {}", notes);
-        return R.ok().data("notes", notes);
+
+        // 提取所有笔记ID
+        List<String> foundNoteIds = notes.stream()
+                .map(Note::getId)
+                .collect(Collectors.toList());
+
+        // 查询笔记-标签关系
+        QueryWrapper<NoteTagRelation> relQuery = new QueryWrapper<>();
+        relQuery.in("note_id", foundNoteIds);
+        List<NoteTagRelation> relations = noteTagRelationService.list(relQuery);
+
+        // 提取所有 tagId
+        Set<String> tagIds = relations.stream()
+                .map(NoteTagRelation::getTagId)
+                .collect(Collectors.toSet());
+
+        // 查询标签信息
+        List<Tag> tags = (List<Tag>) tagService.listByIds(tagIds);
+        Map<String, Tag> tagMap = tags.stream()
+                .collect(Collectors.toMap(Tag::getId, tag -> tag));
+
+        // 构建 noteId -> List<Tag> 映射
+        Map<String, List<Tag>> noteIdToTags = new HashMap<>();
+        for (NoteTagRelation rel : relations) {
+            noteIdToTags.computeIfAbsent(rel.getNoteId(), k -> new ArrayList<>())
+                    .add(tagMap.get(rel.getTagId()));
+        }
+
+        // 构建结果对象列表
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        for (Note note : notes) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("note", note);
+            map.put("tags", noteIdToTags.getOrDefault(note.getId(), Collections.emptyList()));
+            resultList.add(map);
+        }
+
+        log.info("笔记及标签列表: {}", resultList);
+        return R.ok().data("notes", resultList);
     }
+
     @ApiOperation("批量更新用户笔记内容")
     @PostMapping("/updateNotes")
     public R updateNotes(@RequestBody Map<String, Object> requestData) {
